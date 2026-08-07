@@ -1,0 +1,13 @@
+# DROP configuration for the drop-site static app (landing + docs + API
+# reference for dropkit.sh). Deployed via git deploy so a push redeploys it.
+#
+# No `domains:` and no `route:` here on purpose: this app is reached through
+# a hand-written Caddy host file at the apex (see drop's
+# docs/plans/2026-08-07-site-split-and-apex-app.md item 4), not through
+# drop.yaml-declared routing. A top-level `route:` block is accepted by the
+# parser but silently ignored for a standalone (non-monorepo-child) app —
+# see the "What the panel changed" section of that same plan, point 1 — so
+# it is deliberately omitted rather than left in as dead config.
+name: drop-site
+type: static
+build: npm run build
