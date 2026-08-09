@@ -76,6 +76,23 @@ const RELEASES_URL = 'https://github.com/JulesNsenda/drop/releases/latest';
 // DROP install, not just dropkit.sh. No copy may name a specific host, and the
 // "hosted" path must read as "this instance", never "our SaaS".
 
+// Every section id on this page, in document order. LandingPage uses it as the
+// allowlist for hash deep-links, mirroring DOC_ITEM_IDS in DocsContent — so a
+// stale or hand-crafted hash cannot drive scrollIntoView at an arbitrary
+// element. Adding a section means adding its id here as well, or `/#new-id`
+// silently does nothing (the same failure mode CLAUDE.md documents for the
+// docs nav model).
+export const LANDING_SECTION_IDS: string[] = [
+  'how-it-works',
+  'features',
+  'runtimes',
+  'who',
+  'assistant',
+  'dashboard',
+  'run',
+  'technical',
+];
+
 const AGENTS = ['Claude', 'Claude Code', 'Codex', 'Cursor', 'Cline', 'Windsurf'];
 
 const MCP_TOOLS = [
@@ -119,7 +136,7 @@ const GUARDRAILS: { title: string; body: string }[] = [
   },
   {
     title: 'Throwaway apps clean themselves up',
-    body: 'An app can be created with an expiry — 60 minutes by default, 24 hours at most, three live at a time — plus idle reaping and a disk headroom ceiling.',
+    body: 'An app can be created with an expiry (60 minutes by default, 24 hours at most, three live at a time), plus idle reaping and a disk headroom ceiling.',
   },
   {
     title: 'Your app’s output cannot give orders',
@@ -378,8 +395,12 @@ function HeroSection({ onEnter }: HeroProps): JSX.Element {
         }}
       >
         <div>
-          <a
-            href="#assistant"
+          {/* A Link, not a bare <a href="#assistant">: a native anchor changes
+              the URL hash without react-router noticing (it fires hashchange,
+              not popstate), which leaves useLocation() disagreeing with the
+              address bar. Routing it keeps one scroll mechanism on this page. */}
+          <Link
+            to="/#assistant"
             className="dl-hover-border"
             style={{
               display: 'inline-flex',
@@ -401,7 +422,7 @@ function HeroSection({ onEnter }: HeroProps): JSX.Element {
             <span style={{ background: 'var(--accent-soft)', color: 'var(--accent)', borderRadius: 999, padding: '2px 8px' }}>
               →
             </span>
-          </a>
+          </Link>
           {/* 48px, not the old 60: JetBrains Mono runs a 0.6em advance and this
               h1 is two full sentences, so at 60px every line wrapped a second
               time inside the 1.05fr column and the sentence break stopped
@@ -438,8 +459,8 @@ function HeroSection({ onEnter }: HeroProps): JSX.Element {
                 WORKS WITH row directly below lists five clients that do need a
                 token, so the second clause has to be here. Read alone, the
                 first clause would promise the no-key path for all of them. */}
-            Connect DROP to Claude in your browser with a login — no config file, no API key — or to Claude Code and
-            Cursor with a token. Then tell it to put your app on the internet: it deploys, attaches a database, and
+            Connect DROP to Claude in your browser with a login. No config file, no API key. Claude Code and Cursor
+            connect with a token. Then tell it to put your app on the internet: it deploys, attaches a database, and
             reads the logs back to you if anything looks wrong.
           </p>
           <p style={{ fontFamily: 'var(--mono)', fontSize: 12.5, color: 'var(--text-3)', marginBottom: 28 }}>
@@ -520,12 +541,21 @@ function HeroSection({ onEnter }: HeroProps): JSX.Element {
   );
 }
 
-/** The assistant conversation. Lives in the hero; the claim has to be shown. */
+/**
+ * The assistant conversation. Lives in the hero; the claim has to be shown.
+ *
+ * It animates itself in on load via the `dl-step-*` classes in landing.css —
+ * question, reply, tool call, result, summary — with the spinner in the tool
+ * header handing over to "done" on step 4. All of it is CSS, so this component
+ * stays a pure render with no timers or state, and the whole conversation is
+ * in the DOM from the first paint whether or not the animation runs.
+ */
 function AssistantChat(): JSX.Element {
   return (
     <div style={{ position: 'relative', border: '1px solid var(--border)', borderRadius: 16, background: 'var(--panel)', boxShadow: 'var(--elev)', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderBottom: '1px solid var(--border)', background: 'var(--bg-2)' }}>
         <span
+          className="dl-agent-dot"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -545,6 +575,7 @@ function AssistantChat(): JSX.Element {
       </div>
       <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div
+          className="dl-step dl-step-1"
           style={{
             alignSelf: 'flex-end',
             maxWidth: '80%',
@@ -558,18 +589,35 @@ function AssistantChat(): JSX.Element {
         >
           Deploy the <span style={{ fontFamily: 'var(--mono)' }}>./api</span> folder and attach a database.
         </div>
-        <div style={{ fontSize: 13.5, color: 'var(--text-2)' }}>On it. Deploying with DROP.</div>
-        <div style={{ border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg-2)', overflow: 'hidden' }}>
+        <div className="dl-step dl-step-2" style={{ fontSize: 13.5, color: 'var(--text-2)' }}>On it. Deploying with DROP.</div>
+        <div className="dl-step dl-step-3" style={{ border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg-2)', overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 13px', borderBottom: '1px solid var(--border)', fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text)' }}>
             <Settings2 size={14} style={{ color: 'var(--accent)' }} /> called <span style={{ color: 'var(--accent)' }}>deploy_files</span>
             <span style={{ flex: 1 }} />
-            <span style={{ fontSize: 10, color: 'var(--ok)' }}>done</span>
+            {/* Spinner and "done" share one slot: the spinner is absolute, so
+                the hand-over at dl-step-4 costs no layout shift. */}
+            <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', minWidth: 30, justifyContent: 'flex-end' }}>
+              <span
+                className="dl-spinner"
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  width: 11,
+                  height: 11,
+                  borderRadius: '50%',
+                  border: '1.5px solid var(--border)',
+                  borderTopColor: 'var(--accent)',
+                }}
+              />
+              <span className="dl-step dl-step-4" style={{ fontSize: 10, color: 'var(--ok)' }}>done</span>
+            </span>
           </div>
           <pre style={{ margin: 0, padding: '11px 13px', fontFamily: 'var(--mono)', fontSize: 11.5, lineHeight: 1.7, color: 'var(--text-3)' }}>
             {'{ "path": "./api", "database": "postgres" }'}
           </pre>
         </div>
         <div
+          className="dl-step dl-step-4"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -589,7 +637,7 @@ function AssistantChat(): JSX.Element {
             </div>
           </div>
         </div>
-        <div style={{ fontSize: 13.5, color: 'var(--text-2)' }}>
+        <div className="dl-step dl-step-5" style={{ fontSize: 13.5, color: 'var(--text-2)' }}>
           Your FastAPI service is live at <span style={{ fontFamily: 'var(--mono)', color: 'var(--text)' }}>api.localhost</span>{' '}
           with a Postgres database attached and logs streaming to the dashboard.
         </div>
@@ -740,8 +788,8 @@ function WhatYouGet(): JSX.Element {
             It runs whatever your developer built
           </div>
           <p style={{ fontSize: 13.5, color: 'var(--text-2)', lineHeight: 1.6, marginBottom: 14 }}>
-            Node, Python, Go, Docker and plain websites — plus the frameworks built on them, recognised without
-            being told which one it is looking at.
+            Node, Python, Go, Docker and plain websites, plus the frameworks built on them, recognised without being
+            told which one it is looking at.
           </p>
           <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 'auto' }}>
             {RUNTIMES.map((c) => (
@@ -769,8 +817,8 @@ function WhatYouGet(): JSX.Element {
             It picks itself back up
           </div>
           <p style={{ fontSize: 13.5, color: 'var(--text-2)', lineHeight: 1.6 }}>
-            If an app crashes it is restarted automatically, day or night — and everything it printed on the way
-            down is kept, so the problem has an answer.
+            If an app crashes it is restarted automatically, day or night. Everything it printed on the way down is
+            kept, so the problem has an answer.
           </p>
         </div>
       </div>
@@ -851,9 +899,9 @@ function AssistantSection(): JSX.Element {
           </p>
           <p style={{ fontSize: 14.5, color: 'var(--text-2)', lineHeight: 1.7, marginBottom: 24 }}>
             The technical version: DROP hosts its own MCP (Model Context Protocol) server, so any MCP client gets
-            deploy, log and status calls as native tools. It speaks OAuth 2.1 with PKCE — which is what lets you add
-            DROP as a connector in claude.ai from a browser, with a login instead of an API key — and takes a bearer
-            token for clients that can set headers, like Claude Code.
+            deploy, log and status calls as native tools. It speaks OAuth 2.1 with PKCE, which is what lets you add
+            DROP as a connector in claude.ai from a browser, with a login instead of an API key. It also takes a
+            bearer token for clients that can set headers, like Claude Code.
           </p>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {MCP_TOOLS.map((t) => (
@@ -895,7 +943,7 @@ function AssistantSection(): JSX.Element {
           </div>
           <p style={{ fontSize: 14.5, color: 'var(--text-2)', lineHeight: 1.65, marginBottom: 22 }}>
             Handing an assistant the keys is only reasonable if there are limits behind it. Exceeding one returns a
-            clear refusal naming the limit — never a silent failure, and never a killed app.
+            clear refusal naming the limit, never a silent failure and never a killed app.
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {GUARDRAILS.map((g) => (
@@ -1217,7 +1265,7 @@ function TechnicalSection(): JSX.Element {
               conversation instead. The build figure is a plausible Next.js
               install+build, not a flattering one — the old 8.2s matched a
               "~8s median deploy" stat that nothing in the repo measured. */}
-          <Frame title="~/projects — drop">
+          <Frame title="~/projects · drop">
             <div style={{ padding: 22, fontFamily: 'var(--mono)', fontSize: 13.5, lineHeight: 1.95 }}>
               <div>
                 <span style={{ color: 'var(--accent)' }}>$</span> <span style={{ color: 'var(--text)' }}>drop deploy ./myapp</span>

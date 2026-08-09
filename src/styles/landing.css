@@ -61,6 +61,96 @@ html.dark .drop-landing {
   animation: dl-blink 1s step-end infinite;
 }
 
+/*
+ * Hero agent animation. The assistant conversation in HeroSection plays itself
+ * out once on load, so the page's central claim ("your assistant does the
+ * deploy") is shown rather than only asserted.
+ *
+ * Deliberately pure CSS: staged `animation-delay`s on elements that are all
+ * already in the DOM. No JS timer, no state, no effect to tear down on
+ * unmount, and nothing added to the bundle. Delays are cumulative, so each
+ * step starts roughly where the previous one lands; if you retime one, retime
+ * the rest. `dl-step-4` is also when the spinner hands over to "done".
+ */
+@keyframes dl-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes dl-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+.drop-landing .dl-step {
+  opacity: 0;
+  animation: dl-step-in 0.45s cubic-bezier(0.22, 0.8, 0.3, 1) forwards;
+}
+.drop-landing .dl-step-1 {
+  animation-delay: 0.25s;
+}
+.drop-landing .dl-step-2 {
+  animation-delay: 0.75s;
+}
+.drop-landing .dl-step-3 {
+  animation-delay: 1.15s;
+}
+.drop-landing .dl-step-4 {
+  animation-delay: 2.05s;
+}
+.drop-landing .dl-step-5 {
+  animation-delay: 2.45s;
+}
+
+/* The tool call spins while it runs, then hands over to the "done" badge at
+   the same instant (dl-step-4's delay). It is absolutely positioned so the
+   swap costs no layout shift. */
+@keyframes dl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.drop-landing .dl-spinner {
+  animation:
+    dl-spin 0.9s linear infinite,
+    dl-fade-out 0.25s ease forwards 2.05s;
+}
+
+/* The agent avatar breathes while work is in flight, then settles. */
+@keyframes dl-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}
+.drop-landing .dl-agent-dot {
+  animation: dl-pulse 1.6s ease-out 2 0.35s;
+}
+
+/* Motion is decoration here: the same information is in the DOM either way. */
+@media (prefers-reduced-motion: reduce) {
+  .drop-landing .dl-step {
+    opacity: 1;
+    animation: none;
+  }
+  .drop-landing .dl-spinner,
+  .drop-landing .dl-agent-dot,
+  .drop-landing .dl-cursor {
+    animation: none;
+  }
+  .drop-landing .dl-spinner {
+    opacity: 0;
+  }
+}
+
 /* Sticky-nav offset for in-page anchor jumps (#features, #mcp, …) */
 .drop-landing [id] {
   scroll-margin-top: 80px;

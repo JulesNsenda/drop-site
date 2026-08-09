@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 
 // Self-hosted fonts (JetBrains Mono + Hanken Grotesk) are imported once at the
 // site entry (site-main.tsx) so they're available across the marketing site
@@ -8,7 +9,7 @@ import '../styles/landing.css';
 import { useTheme } from '../hooks/useTheme';
 import { SiteNav } from '../components/landing/SiteNav';
 import { SiteFooter } from '../components/landing/SiteFooter';
-import { LandingSections } from '../components/landing/LandingSections';
+import { LandingSections, LANDING_SECTION_IDS } from '../components/landing/LandingSections';
 
 // The marketing bundle makes no API calls (DROP-070) — there is no
 // `/api/v1/auth/status` probe here anymore. Auth is on by default (see
@@ -44,6 +45,34 @@ function LandingPage() {
   // false), so the landing's CTAs point at the invite request instead — see
   // REQUEST_ACCESS_URL in LandingSections.
   const onToggleTheme = () => setTheme(isDark ? 'light' : 'dark');
+
+  // Deep-link support, the landing-page counterpart of the effect in DocsPage
+  // and ReferencePage. Without it `https://dropkit.sh/#runtimes` did nothing:
+  // this is a client-rendered SPA, so the browser looks for the element while
+  // index.html is still an empty shell, finds nothing, and never retries.
+  //
+  // Two differences from the docs pages, both deliberate. It keys on the
+  // router's location rather than running once on mount, because here the nav
+  // and footer links ARE the in-page navigation (the docs pages have their own
+  // scrollToSection for that) and a hash-only change does not remount the
+  // page. And it includes `key`, which react-router changes on every
+  // navigation, so clicking the same link twice still scrolls.
+  const { hash, key } = useLocation();
+  const firstJump = useRef(true);
+  useEffect(() => {
+    const id = hash.replace(/^#/, '');
+    if (!id || !LANDING_SECTION_IDS.includes(id)) return;
+    // One frame, so the section exists on a cold load before we look for it.
+    const raf = requestAnimationFrame(() => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      // Instant on arrival (a smooth scroll from the top of a long page is a
+      // long ride); smooth once the reader is already here and clicking.
+      el.scrollIntoView({ block: 'start', behavior: firstJump.current ? 'auto' : 'smooth' });
+      firstJump.current = false;
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [hash, key]);
 
   return (
     <div className="drop-landing">

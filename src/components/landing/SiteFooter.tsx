@@ -26,9 +26,12 @@ const FOOTER_COLUMNS: FooterColumn[] = [
     key: 'product',
     title: 'Product',
     links: [
-      { label: 'What you get', href: '#features' },
+      // `/#…`, not bare `#…`: this footer renders on /docs and /docs/api too,
+      // where a bare hash resolved against the current path and did nothing.
+      // LandingPage's deep-link effect handles the scroll once we land.
+      { label: 'What you get', to: '/#features' },
       { label: 'Dashboard', enter: true },
-      { label: 'Runtimes', href: '#runtimes' },
+      { label: 'Runtimes', to: '/#runtimes' },
       { label: 'Changelog', href: GITHUB_URL, external: true },
     ],
   },

@@ -24,7 +24,12 @@ interface NavLinkItem {
 const NAV_LINKS: NavLinkItem[] = [
   // Label tracks the section's own heading ("What you get"); the #features id
   // stays put because SiteFooter anchors to it too.
-  { key: 'features', label: 'What you get', href: '#features' },
+  //
+  // `/#features`, not a bare `#features`: this nav renders on /docs and
+  // /docs/api as well, where a bare hash resolved against the current path and
+  // did nothing at all. The leading slash routes back to the landing page, and
+  // LandingPage's deep-link effect does the scrolling on arrival.
+  { key: 'features', label: 'What you get', to: '/#features' },
   { key: 'docs', label: 'Docs', to: '/docs' },
   { key: 'api', label: 'API', to: '/docs/api' },
   { key: 'dashboard', label: 'Dashboard', enter: true },
