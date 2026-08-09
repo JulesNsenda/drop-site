@@ -11,3 +11,15 @@
 name: drop-site
 type: static
 build: npm run build
+
+# Pinned because the apex Caddy host file hardcodes this upstream port. DROP
+# would otherwise only REMEMBER whatever it allocated first — stable in
+# practice, since the app config is the source of truth across restarts, but
+# not stable by declaration, and the apex would break silently if it were
+# ever reallocated.
+#
+# Honoured as a preference, not a claim: if this port is already taken, is
+# outside the platform's configured range, or is the DROP API port itself,
+# the deploy still succeeds on an auto-allocated port and logs why. So check
+# the app's actual port after changing this rather than assuming it took.
+port: 3002
