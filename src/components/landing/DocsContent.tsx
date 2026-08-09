@@ -410,7 +410,7 @@ export function DocsBody(): JSX.Element {
 
       <Section id="installation" title="Installation">
         <p style={pStyle}>
-          Installing from a release needs a systemd Linux box and nothing else — the installer sets up{' '}
+          Installing from a release needs a systemd Linux box and nothing else. The installer sets up{' '}
           <strong style={{ color: 'var(--text)' }}>Node.js 20</strong>, PostgreSQL and Caddy for you. Building from
           source additionally needs <strong style={{ color: 'var(--text)' }}>Node.js 20+</strong> and{' '}
           <strong style={{ color: 'var(--text)' }}>npm 9+</strong> already installed, plus optionally{' '}
@@ -428,7 +428,7 @@ export function DocsBody(): JSX.Element {
           >
             latest release
           </a>{' '}
-          and run it. Save it to disk first — <code>install.sh</code> refuses to run piped from <code>curl</code>.
+          and run it. Save it to disk first: <code>install.sh</code> refuses to run piped from <code>curl</code>.
         </p>
         <CodeBlock
           label="shell"
@@ -438,7 +438,7 @@ sudo bash install.sh --from-release --isolation=docker`}
         <p style={pStyle}>
           <code>--from-release</code> requires you to choose an isolation mode explicitly.{' '}
           <code>--isolation=docker</code> runs each app in its own container; <code>--isolation=none</code> runs them
-          as the <code>drop</code> system user, which can read the platform's own secrets — only pick that on a
+          as the <code>drop</code> system user, which can read the platform's own secrets, so only pick that on a
           machine where every deployer is trusted. The installer verifies the bundle's SHA-256 before installing
           anything.
         </p>

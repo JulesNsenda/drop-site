@@ -142,7 +142,7 @@ function ReferencePage(): JSX.Element {
         </h1>
         <p style={{ fontSize: 16, color: 'var(--text-2)', maxWidth: 620, lineHeight: 1.7 }}>
           The REST API (mounted at <code>/api/v1</code>) and the <code>drop</code> CLI, enumerated directly from{' '}
-          <code>src/api/routes/</code> and <code>src/cli/commands/</code> — not an illustrative sketch.
+          <code>src/api/routes/</code> and <code>src/cli/commands/</code>, not an illustrative sketch.
         </p>
       </header>
 

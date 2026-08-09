@@ -2,7 +2,7 @@
 
 > DROP (Deploy, Run, Operate, Publish) is a self-hosted PaaS for "drop a folder,
 > get a URL" deploys. Drop a directory into the watched webapps folder and it is
-> detected, built, given a port, routed through Caddy with HTTPS, and started —
+> detected, built, given a port, routed through Caddy with HTTPS, and started,
 > with no configuration for the common cases. It is a single Node.js service
 > that bundles a file watcher, a build pipeline, an app runtime (PM2 processes
 > or Docker containers), PostgreSQL, optional Redis, a Caddy reverse proxy, a
@@ -42,7 +42,7 @@ Four supported paths, all equivalent once the app is registered:
    up and deploys it. This is the zero-configuration path.
 2. **Git**: point DROP at a repository; a push redeploys it.
 3. **Upload**: `POST /api/v1/apps/<name>/source` with a tarball.
-4. **MCP tools** (see below) — the path an agent should normally take.
+4. **MCP tools** (see below): the path an agent should normally take.
 
 App type is auto-detected in priority order: an explicit `drop.yaml` manifest,
 then Node.js, Python, Docker, and finally static/SPA. A `Dockerfile` is honoured
@@ -52,7 +52,7 @@ when present.
 
 Optional. Add it only when detection needs correcting or you want databases,
 domains, secrets or a health check. Unknown top-level keys are rejected outright,
-so do not invent fields — this is the full set of common ones:
+so do not invent fields; this is the full set of common ones:
 
 ```yaml
 name: my-app
@@ -75,7 +75,7 @@ Notes that trip people up:
 - `build` and `start` must be plain strings. Nesting them under a `command:` key
   is invalid.
 - There is no `runtime:` key (use `type:`) and no `persist:` key (persistent
-  storage is automatic — see `DROP_DATA_DIR` below).
+  storage is automatic, see `DROP_DATA_DIR` below).
 - `port:` is a *preference*, not a claim. If the port is already held by another
   app, outside the configured range, or the DROP API port itself, the deploy
   still succeeds on an auto-allocated port and logs why. Check the app's actual
@@ -88,13 +88,13 @@ Notes that trip people up:
 
 Read these from the process environment; do not hardcode equivalents.
 
-- `PORT` — the port to listen on. Always bind this.
-- `DROP_DATA_DIR` — a persistent directory that survives redeploys and upgrades.
+- `PORT`: the port to listen on. Always bind this.
+- `DROP_DATA_DIR`: a persistent directory that survives redeploys and upgrades.
   Write user data here, never into the app directory.
-- `DATABASE_URL` — present when a database was provisioned (`database: postgres`).
-- `REDIS_URL` — present when the app opted into managed Redis.
-- `DROP_API_URL` — base URL of DROP's own REST API, reachable from inside the app.
-- `DROP_API_KEY` — a scoped, least-privilege key, injected only for apps an
+- `DATABASE_URL`: present when a database was provisioned (`database: postgres`).
+- `REDIS_URL`: present when the app opted into managed Redis.
+- `DROP_API_URL`: base URL of DROP's own REST API, reachable from inside the app.
+- `DROP_API_KEY`: a scoped, least-privilege key, injected only for apps an
   admin has explicitly granted control-plane capabilities. Usually absent.
 
 Plus any `env:` values and secrets declared in `drop.yaml`. Note that
@@ -109,7 +109,7 @@ for the hosted instance). Route groups: `health`, `auth`, `apps`, `usage`,
 `oauth`, `mcp-gateway`.
 
 Authentication is on by default: a JWT bearer or an API key, with three role
-tiers — `readonly`, `user`, `admin`. TOTP MFA is supported. Credential-minting
+tiers: `readonly`, `user`, `admin`. TOTP MFA is supported. Credential-minting
 and expensive endpoints carry their own stricter rate limits.
 
 `GET /api/v1/health` is unauthenticated and reports per-component status.
@@ -119,12 +119,12 @@ and expensive endpoints carry their own stricter rate limits.
 DROP hosts its own MCP server exposing deploy, status and log tools, so an agent
 can deploy and operate apps directly.
 
-- Endpoint: `POST /api/v1/mcp` — **POST only**. It is stateless Streamable HTTP;
+- Endpoint: `POST /api/v1/mcp`, **POST only**. It is stateless Streamable HTTP;
   GET and DELETE deliberately return a JSON-RPC-shaped 405 because no sessions
   or streams exist in this mode.
 - Hosted endpoint: `https://dashboard.dropkit.sh/api/v1/mcp`
 - Auth: OAuth 2.1 with PKCE for browser-based connectors (claude.ai's web
-  connector supports only this — it has no custom-header field), or a static
+  connector supports only this, it has no custom-header field), or a static
   bearer token for clients that can set headers, such as Claude Code.
 - OAuth discovery metadata is served from fixed root paths as RFC 8414/9728
   require, e.g. `/.well-known/oauth-authorization-server` and
