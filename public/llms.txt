@@ -83,6 +83,14 @@ Notes that trip people up:
 - Other supported keys: `redis`, `build_env`, `depends_on`, `maxBodySize`,
   `timeout`, `mcp`, and `group`/`services` for a monorepo deploying several apps
   from one repository.
+- `database:` takes `postgres` or `true` to ask for one, and `false` to decline
+  one — including declining the auto-detection that would otherwise provision a
+  database just because `pg` or an ORM is in `package.json`.
+- `depends_on[].env` names the variable another app's URL is injected into. It
+  must be a valid environment variable name, and names DROP injects itself
+  (`DATABASE_URL`, `REDIS_URL`, `DROP_API_URL`, `DROP_API_KEY`, `PORT`,
+  `DROP_DATA_DIR`, the `PG*`/`DB_*` connection variables) are refused: the
+  dependency URL is skipped and a warning logged, the deploy still succeeds.
 
 ## Environment variables injected into your app
 
@@ -91,15 +99,32 @@ Read these from the process environment; do not hardcode equivalents.
 - `PORT`: the port to listen on. Always bind this.
 - `DROP_DATA_DIR`: a persistent directory that survives redeploys and upgrades.
   Write user data here, never into the app directory.
-- `DATABASE_URL`: present when a database was provisioned (`database: postgres`).
+- `DATABASE_URL`: present when a database was provisioned (`database: postgres`),
+  or your own value if you set one — see the external-database note below.
 - `REDIS_URL`: present when the app opted into managed Redis.
 - `DROP_API_URL`: base URL of DROP's own REST API, reachable from inside the app.
 - `DROP_API_KEY`: a scoped, least-privilege key, injected only for apps an
   admin has explicitly granted control-plane capabilities. Usually absent.
 
-Plus any `env:` values and secrets declared in `drop.yaml`. Note that
-`DATABASE_URL` is applied last and overrides a same-named value set in `env:` or
-in secrets.
+Plus any `env:` values and secrets declared in `drop.yaml`. Note that a
+DROP-provisioned `DATABASE_URL` is applied last and overrides a same-named value
+set in `env:` or in secrets.
+
+To run against a database DROP does not host (Supabase, Neon, RDS), store the
+connection string as a secret on an app that has no DROP-managed database:
+
+```
+PUT /api/v1/secrets/<app>   {"key": "DATABASE_URL", "value": "postgresql://..."}
+```
+
+DROP then sees the app already has a `DATABASE_URL` and skips provisioning, so
+no empty database is created beside it. Prefer this to a `drop.yaml` `env:`
+entry, which would commit the credential in plaintext. An app that *already*
+has a DROP-managed database is refused — its injected URL takes precedence and
+would override the secret anyway, and a provisioned database cannot be handed
+back short of deleting the app. An external Redis works the same way, but pair
+the `REDIS_URL` secret with `redis: false`: Redis auto-detection, unlike the
+database path, does not check whether you already supplied one.
 
 ## REST API
 
