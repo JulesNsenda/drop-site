@@ -569,12 +569,12 @@ timeout: 30`}
             ['type', 'Skip detection and pin the app type (e.g. nodejs, static)'],
             ['domains', 'Custom hostnames routed to this app'],
             ['tls.certFile / tls.keyFile / tls.disabled', 'Bring your own certificate, or disable HTTPS for this app'],
-            ['database', 'Provision a database for this app (postgres, or true) and inject DATABASE_URL. false is not an opt-out — it means "no opinion" and auto-detection still applies'],
+            ['database', 'Provision a database for this app (postgres, or true) and inject DATABASE_URL. false is not an opt-out: it means "no opinion", and auto-detection still applies'],
             ['redis', 'Provision managed Redis: a per-app logical DB, injected as REDIS_URL'],
             ['env', 'Static environment variables, available at build and run time (string, number, or boolean)'],
             ['build_env', "Build-only variables, merged into the build and never into the running app. For values a bundler inlines (Vite's VITE_*) that shouldn't linger in the runtime env"],
             ['secrets', 'Declare the secrets this app cannot start without (see below)'],
-            ['depends_on', "Inject another app's URL into an env var: { name, env, path? }. env must be a valid variable name, and can only fill a gap — it never overwrites a secret or a value DROP sets itself"],
+            ['depends_on', "Inject another app's URL into an env var: { name, env, path? }. env must be a valid variable name, and can only fill a gap: it never overwrites a secret or a value DROP sets itself"],
             ['port', 'Pin a specific port instead of auto-assignment'],
             ['build / start', 'Override the detected build/start command'],
             ['healthCheck', 'Path used for readiness checks'],
@@ -804,7 +804,7 @@ drop serve --domain example.com --https --wildcard --dns-provider cloudflare`}
         </p>
         <Callout tone="warn">
           <code>database: false</code> is <strong style={{ color: 'var(--text)' }}>not</strong> an opt-out. It
-          parses, but it means "no opinion" — the auto-detection above still applies, so an app with{' '}
+          parses, but it means "no opinion": the auto-detection above still applies, so an app with{' '}
           <code>pg</code> in its dependencies is still given a database. To run without one, make sure none of the
           three triggers above fires, or supply your own <code>DATABASE_URL</code> as described below.
         </Callout>
@@ -827,7 +827,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });`}
         <p style={pStyle}>
           To run against a database DROP does not host, give the app its own <code>DATABASE_URL</code> as a secret.
           Secrets are encrypted at rest and injected at start, so the connection string never sits in your
-          repository — which is the whole reason to prefer this over a <code>drop.yaml</code> <code>env:</code>{' '}
+          repository, which is the whole reason to prefer this over a <code>drop.yaml</code> <code>env:</code>{' '}
           entry, where it would be committed in plaintext:
         </p>
         <CodeBlock
@@ -839,23 +839,23 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });`}
         />
         <p style={pStyle}>
           Or set it in the dashboard under the app's <strong style={{ color: 'var(--text)' }}>Secrets</strong> tab.
-          Setting it is enough — DROP sees the app already has a <code>DATABASE_URL</code> and skips provisioning, so
+          Setting it is enough: DROP sees the app already has a <code>DATABASE_URL</code> and skips provisioning, so
           no empty PostgreSQL database is created alongside it. Nothing else in <code>drop.yaml</code> is needed, and
           the app reads <code>process.env.DATABASE_URL</code> exactly as it would with a DROP-provisioned one.
         </p>
         <Callout tone="info">
           One case is refused: an app that <em>already has</em> a DROP-managed database cannot be repointed this
           way. Its injected <code>DATABASE_URL</code> takes precedence over any secret, so the secret would be
-          stored and then silently overridden — better to reject it than to look like it worked. There is no way to
-          hand back a provisioned database short of deleting the app, so set the secret on an app that has never
-          been given one — ideally before its first deploy, since setting it early is also what stops auto-detection
-          provisioning one in the first place.
+          stored and then silently overridden, and it is better to reject it than to look like it worked. There is
+          no way to hand back a provisioned database short of deleting the app, so set the secret on an app that has
+          never been given one, ideally before its first deploy, since setting it early is also what stops
+          auto-detection provisioning one in the first place.
         </Callout>
         <p style={pStyle}>
           An external Redis works the same way, with one extra step: unlike the database path, Redis
           auto-detection does not check whether you already supplied a <code>REDIS_URL</code>. An app with{' '}
           <code>ioredis</code> or <code>bullmq</code> in its dependencies gets managed Redis provisioned and its
-          own <code>REDIS_URL</code> overridden — so pair the secret with <code>redis: false</code> in{' '}
+          own <code>REDIS_URL</code> overridden, so pair the secret with <code>redis: false</code> in{' '}
           <code>drop.yaml</code>.
         </p>
         <p style={pStyle}>

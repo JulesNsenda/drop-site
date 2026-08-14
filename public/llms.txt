@@ -84,13 +84,13 @@ Notes that trip people up:
   `timeout`, `mcp`, and `group`/`services` for a monorepo deploying several apps
   from one repository.
 - `database:` takes `postgres` or `true` to ask for one. `database: false` is
-  NOT an opt-out — it parses, but auto-detection still applies, so an app with
+  NOT an opt-out. It parses, but auto-detection still applies, so an app with
   `pg` or an ORM in `package.json` is still given a database. To run without
   one, avoid those triggers or supply your own `DATABASE_URL` (below).
 - `depends_on[].env` names the variable another app's URL is injected into. It
   must be a valid environment variable name, and it can only fill a gap: it
   never overwrites one of your secrets or a value DROP sets itself
-  (`DATABASE_URL`, `REDIS_URL`, `DROP_API_URL`, `PORT`, …). A collision skips
+  (`DATABASE_URL`, `REDIS_URL`, `DROP_API_URL`, `PORT`, ...). A collision skips
   that one injection and logs a warning; the deploy still succeeds.
 
 ## Environment variables injected into your app
@@ -101,7 +101,7 @@ Read these from the process environment; do not hardcode equivalents.
 - `DROP_DATA_DIR`: a persistent directory that survives redeploys and upgrades.
   Write user data here, never into the app directory.
 - `DATABASE_URL`: present when a database was provisioned (`database: postgres`),
-  or your own value if you set one — see the external-database note below.
+  or your own value if you set one (see the external-database note below).
 - `REDIS_URL`: present when the app opted into managed Redis.
 - `DROP_API_URL`: base URL of DROP's own REST API, reachable from inside the app.
 - `DROP_API_KEY`: a scoped, least-privilege key, injected only for apps an
@@ -121,7 +121,7 @@ PUT /api/v1/secrets/<app>   {"key": "DATABASE_URL", "value": "postgresql://..."}
 DROP then sees the app already has a `DATABASE_URL` and skips provisioning, so
 no empty database is created beside it. Prefer this to a `drop.yaml` `env:`
 entry, which would commit the credential in plaintext. An app that *already*
-has a DROP-managed database is refused — its injected URL takes precedence and
+has a DROP-managed database is refused: its injected URL takes precedence and
 would override the secret anyway, and a provisioned database cannot be handed
 back short of deleting the app. An external Redis works the same way, but pair
 the `REDIS_URL` secret with `redis: false`: Redis auto-detection, unlike the
