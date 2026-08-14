@@ -83,14 +83,15 @@ Notes that trip people up:
 - Other supported keys: `redis`, `build_env`, `depends_on`, `maxBodySize`,
   `timeout`, `mcp`, and `group`/`services` for a monorepo deploying several apps
   from one repository.
-- `database:` takes `postgres` or `true` to ask for one, and `false` to decline
-  one — including declining the auto-detection that would otherwise provision a
-  database just because `pg` or an ORM is in `package.json`.
+- `database:` takes `postgres` or `true` to ask for one. `database: false` is
+  NOT an opt-out — it parses, but auto-detection still applies, so an app with
+  `pg` or an ORM in `package.json` is still given a database. To run without
+  one, avoid those triggers or supply your own `DATABASE_URL` (below).
 - `depends_on[].env` names the variable another app's URL is injected into. It
-  must be a valid environment variable name, and names DROP injects itself
-  (`DATABASE_URL`, `REDIS_URL`, `DROP_API_URL`, `DROP_API_KEY`, `PORT`,
-  `DROP_DATA_DIR`, the `PG*`/`DB_*` connection variables) are refused: the
-  dependency URL is skipped and a warning logged, the deploy still succeeds.
+  must be a valid environment variable name, and it can only fill a gap: it
+  never overwrites one of your secrets or a value DROP sets itself
+  (`DATABASE_URL`, `REDIS_URL`, `DROP_API_URL`, `PORT`, …). A collision skips
+  that one injection and logs a warning; the deploy still succeeds.
 
 ## Environment variables injected into your app
 

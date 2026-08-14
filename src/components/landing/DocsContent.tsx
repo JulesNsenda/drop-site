@@ -569,12 +569,12 @@ timeout: 30`}
             ['type', 'Skip detection and pin the app type (e.g. nodejs, static)'],
             ['domains', 'Custom hostnames routed to this app'],
             ['tls.certFile / tls.keyFile / tls.disabled', 'Bring your own certificate, or disable HTTPS for this app'],
-            ['database', 'Provision a database for this app (postgres, or true) and inject DATABASE_URL. database: false opts out entirely, including out of auto-detection'],
+            ['database', 'Provision a database for this app (postgres, or true) and inject DATABASE_URL. false is not an opt-out — it means "no opinion" and auto-detection still applies'],
             ['redis', 'Provision managed Redis: a per-app logical DB, injected as REDIS_URL'],
             ['env', 'Static environment variables, available at build and run time (string, number, or boolean)'],
             ['build_env', "Build-only variables, merged into the build and never into the running app. For values a bundler inlines (Vite's VITE_*) that shouldn't linger in the runtime env"],
             ['secrets', 'Declare the secrets this app cannot start without (see below)'],
-            ['depends_on', "Inject another app's URL into an env var: { name, env, path? }. env must be a valid variable name, and names DROP injects itself (DATABASE_URL, REDIS_URL, DROP_API_URL, PORT, …) are refused"],
+            ['depends_on', "Inject another app's URL into an env var: { name, env, path? }. env must be a valid variable name, and can only fill a gap — it never overwrites a secret or a value DROP sets itself"],
             ['port', 'Pin a specific port instead of auto-assignment'],
             ['build / start', 'Override the detected build/start command'],
             ['healthCheck', 'Path used for readiness checks'],
@@ -800,9 +800,14 @@ drop serve --domain example.com --https --wildcard --dns-provider cloudflare`}
         <p style={pStyle}>
           Point an app at a database yourself and DROP steps aside: an app already pointed at one is never given a
           second one behind its back. An explicit <code>database: postgres</code> in <code>drop.yaml</code> still
-          wins, since that is asking for a DROP database in as many words, and <code>database: false</code> declines
-          one outright.
+          wins, since that is asking for a DROP database in as many words.
         </p>
+        <Callout tone="warn">
+          <code>database: false</code> is <strong style={{ color: 'var(--text)' }}>not</strong> an opt-out. It
+          parses, but it means "no opinion" — the auto-detection above still applies, so an app with{' '}
+          <code>pg</code> in its dependencies is still given a database. To run without one, make sure none of the
+          three triggers above fires, or supply your own <code>DATABASE_URL</code> as described below.
+        </Callout>
         <CodeBlock
           label="app.js"
           code={`const { Pool } = require('pg');
@@ -843,7 +848,8 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });`}
           way. Its injected <code>DATABASE_URL</code> takes precedence over any secret, so the secret would be
           stored and then silently overridden — better to reject it than to look like it worked. There is no way to
           hand back a provisioned database short of deleting the app, so set the secret on an app that has never
-          been given one, or declare <code>database: false</code> before its first deploy.
+          been given one — ideally before its first deploy, since setting it early is also what stops auto-detection
+          provisioning one in the first place.
         </Callout>
         <p style={pStyle}>
           An external Redis works the same way, with one extra step: unlike the database path, Redis
