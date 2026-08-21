@@ -55,6 +55,7 @@ export const DOC_GROUPS: DocGroup[] = [
       { id: 'runtimes', title: 'Runtimes & detection' },
       { id: 'routing-https', title: 'Routing & HTTPS' },
       { id: 'databases', title: 'Databases' },
+      { id: 'backing-services', title: 'Backing services' },
       { id: 'logs', title: 'Logs' },
     ],
   },
@@ -846,10 +847,14 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });`}
         <Callout tone="info">
           One case is refused: an app that <em>already has</em> a DROP-managed database cannot be repointed this
           way. Its injected <code>DATABASE_URL</code> takes precedence over any secret, so the secret would be
-          stored and then silently overridden, and it is better to reject it than to look like it worked. There is
-          no way to hand back a provisioned database short of deleting the app, so set the secret on an app that has
-          never been given one, ideally before its first deploy, since setting it early is also what stops
-          auto-detection provisioning one in the first place.
+          stored and then silently overridden, and it is better to reject it than to look like it worked. The
+          simplest path is to set the secret on an app that has never been given one, ideally before its first
+          deploy, since setting it early is also what stops auto-detection provisioning one in the first place. If
+          the app already has a DROP database, detach it first (see{' '}
+          <a href="#backing-services" style={linkStyle}>
+            Backing services
+          </a>
+          ). Once the detach has gone through, the refusal lifts and your own <code>DATABASE_URL</code> is accepted.
         </Callout>
         <p style={pStyle}>
           An external Redis works the same way, with one extra step: unlike the database path, Redis
@@ -877,6 +882,89 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });`}
           It is a convenience, not a hard dependency: on a platform where Redis is disabled (
           <code>DROP_ENABLE_REDIS=false</code>) apps simply start without <code>REDIS_URL</code>, the same way they
           do when Postgres is unavailable, so an app that can fall back should check for the variable.
+        </p>
+      </Section>
+
+      <Section id="backing-services" title="Backing services">
+        <p style={pStyle}>
+          Everything DROP can attach to an app is listed in the dashboard under{' '}
+          <strong style={{ color: 'var(--text)' }}>Catalog</strong>: the backing services above, plus the app types
+          DROP detects and builds. Each card says what it is, whether it is available on this instance, and how to
+          ask for it. The same list is readable over the API at <code>GET /api/v1/extensions</code>.
+        </p>
+        <p style={pStyle}>
+          Most apps never need this page: the rules under{' '}
+          <a href="#databases" style={linkStyle}>
+            Databases
+          </a>{' '}
+          already provision what an app asks for at deploy time. It earns its place when you want to change your
+          mind about an app that is already running, which is what attach and detach are for.
+        </p>
+
+        <h3 style={h3Style}>Attach and detach</h3>
+        <p style={pStyle}>
+          An app's <strong style={{ color: 'var(--text)' }}>Database</strong> tab carries an Attach control for
+          Postgres and for Redis, and a Detach control once one is attached. Attaching provisions the service,
+          records your choice, and restarts the app so the new variable is in its environment. Detaching removes
+          it the same way, so the variable is genuinely gone rather than merely unused.
+        </p>
+        <DocTable
+          headers={['Action', 'What happens']}
+          rows={[
+            ['Attach postgres', 'Provisions a database and role, then restarts the app with DATABASE_URL injected'],
+            ['Attach redis', 'Allocates a logical Redis database, then restarts the app with REDIS_URL injected'],
+            ['Detach postgres', 'Writes a compressed backup, drops the database and its role, then restarts the app without DATABASE_URL'],
+            ['Detach redis', 'Flushes the logical database and releases it, then restarts the app without REDIS_URL'],
+          ]}
+        />
+        <Callout tone="warn">
+          Detaching Postgres <strong style={{ color: 'var(--text)' }}>destroys the database</strong>. A compressed
+          dump is written on the platform host first, and the confirmation names it, but it is an operator-side
+          artifact with its own retention window, not a restore button in the dashboard. Detaching Redis flushes
+          the data <strong style={{ color: 'var(--text)' }}>immediately with no backup at all</strong>, because
+          there is nothing there DROP treats as durable. Read the confirmation dialog: it states which of the two
+          you are about to do.
+        </Callout>
+
+        <h3 style={h3Style}>Your choice outranks drop.yaml</h3>
+        <p style={pStyle}>
+          Attach and detach are remembered, so a redeploy does not quietly undo them. That matters most for
+          detach: without a durable record, the next deploy would re-read <code>database: postgres</code> from{' '}
+          <code>drop.yaml</code>, or re-detect <code>pg</code> in your dependencies, and provision a fresh database
+          straight back. The order DROP resolves is:
+        </p>
+        <CodeBlock label="precedence" code={`attach / detach  >  drop.yaml  >  auto-detection`} />
+        <p style={pStyle}>
+          So once you have attached or detached a service through the dashboard, that manifest key stops deciding
+          the question for that app, and re-attaching is what hands authority back. This is deliberate: on an app
+          deployed from someone else's repository the manifest author is not you, and a stale{' '}
+          <code>database: postgres</code> upstream should not be able to keep re-provisioning a database against
+          your own quota.
+        </p>
+
+        <h3 style={h3Style}>Refusals</h3>
+        <p style={pStyle}>
+          Both actions answer with a reason rather than failing silently. The ones worth knowing:
+        </p>
+        <DocTable
+          headers={['Refusal', 'Why']}
+          rows={[
+            ['Already has its own URL', 'The app supplies DATABASE_URL or REDIS_URL itself, as a secret or in drop.yaml env. Attaching would repoint a working app at an empty database'],
+            ['Quota exceeded', 'Attaching would exceed your per-user database or Redis limit'],
+            ['Ephemeral app', 'Throwaway apps are reaped on a timer, and attached data would go with them'],
+            ['Too soon', 'A short cooldown between detaches on the same app, since each Postgres detach writes a full dump'],
+            ['App is busy', 'A deploy or another service change is already in flight for this app'],
+          ]}
+        />
+        <p style={pStyle}>
+          Everything here is available over the API too:{' '}
+          <code>POST /api/v1/apps/:name/services/:id</code> to attach and{' '}
+          <code>DELETE /api/v1/apps/:name/services/:id</code> to detach, where <code>:id</code> is{' '}
+          <code>postgres</code> or <code>redis</code>. See the{' '}
+          <Link to="/docs/api" style={linkStyle}>
+            API reference
+          </Link>{' '}
+          for roles and responses.
         </p>
       </Section>
 

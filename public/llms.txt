@@ -122,17 +122,60 @@ DROP then sees the app already has a `DATABASE_URL` and skips provisioning, so
 no empty database is created beside it. Prefer this to a `drop.yaml` `env:`
 entry, which would commit the credential in plaintext. An app that *already*
 has a DROP-managed database is refused: its injected URL takes precedence and
-would override the secret anyway, and a provisioned database cannot be handed
-back short of deleting the app. An external Redis works the same way, but pair
-the `REDIS_URL` secret with `redis: false`: Redis auto-detection, unlike the
+would override the secret anyway. Detach the DROP database first (below) and
+the refusal lifts. An external Redis works the same way, but pair the
+`REDIS_URL` secret with `redis: false`: Redis auto-detection, unlike the
 database path, does not check whether you already supplied one.
+
+## Backing services: attach and detach
+
+`GET /api/v1/extensions` lists everything this build can attach or build:
+backing services and app types, each with its availability on this instance.
+It is platform-scoped, so it carries no per-app state; whether a given app
+already has a service, and whether the owner's quota is full, come from
+`GET /api/v1/db/<app>`.
+
+To change an app's services after it is deployed:
+
+```
+POST   /api/v1/apps/<app>/services/<id>    attach   (<id> = postgres | redis)
+DELETE /api/v1/apps/<app>/services/<id>    detach
+```
+
+Both require the `user` role and ownership of the app. Attach provisions the
+service and restarts the app with the variable injected; the response names the
+injected variables but never their values. Detach removes it and restarts the
+app without the variable.
+
+Detach destroys data. Postgres is dumped on the platform host before the
+database and its role are dropped, and that dump is an operator-side artifact
+with its own retention window, not something an API caller can restore. Redis
+is flushed immediately with no backup at all.
+
+Attach and detach are recorded durably and outrank the manifest:
+
+```
+attach / detach  >  drop.yaml  >  auto-detection
+```
+
+Without that, the next deploy would re-read `database: postgres`, or re-detect
+a Postgres client in `package.json`, and provision a fresh database straight
+back. So once a service has been attached or detached for an app, that manifest
+key no longer decides the question for it, and re-attaching hands authority
+back. On an app deployed from a repository you do not own, this is what stops a
+stale upstream manifest re-provisioning against your quota.
+
+Refusals are structured, not silent. Expect: the app already supplies its own
+`DATABASE_URL` or `REDIS_URL`; the owner's quota is exceeded; the app is
+ephemeral, so attached data would be reaped on its timer; a cooldown between
+detaches on the same app; or the app is busy with another deploy.
 
 ## REST API
 
 Base path `/api/v1` on the platform host (`https://dashboard.dropkit.sh/api/v1`
 for the hosted instance). Route groups: `health`, `auth`, `apps`, `usage`,
-`logs`, `certs`, `deploys`, `secrets`, `db`, `webhooks`, `git`, `admin`,
-`oauth`, `mcp-gateway`.
+`logs`, `certs`, `deploys`, `secrets`, `db`, `extensions`, `webhooks`, `git`,
+`admin`, `oauth`, `mcp-gateway`.
 
 Authentication is on by default: a JWT bearer or an API key, with three role
 tiers: `readonly`, `user`, `admin`. TOTP MFA is supported. Credential-minting

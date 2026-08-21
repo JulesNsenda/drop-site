@@ -152,6 +152,8 @@ export const ENDPOINT_GROUPS: EndpointGroupDef[] = [
       { method: 'POST', path: '/api/v1/apps/:name/stop', description: 'Stop a running app.', role: 'user' },
       { method: 'POST', path: '/api/v1/apps/:name/restart', description: 'Restart an app.', role: 'user' },
       { method: 'POST', path: '/api/v1/apps/:name/promote', description: 'Put a held build in front of traffic. Human sessions only. An agent token is refused (403) whatever its role.', role: 'user' },
+      { method: 'POST', path: '/api/v1/apps/:name/services/:id', description: "Attach a backing service (:id is postgres or redis): provision it, record the intent, and restart the app with its URL injected. Returns the injected variable NAMES only, never their values. Refusals are structured, e.g. the app already supplies its own URL, quota exceeded, or the app is ephemeral.", role: 'user' },
+      { method: 'DELETE', path: '/api/v1/apps/:name/services/:id', description: "Detach a backing service. Postgres is dumped on the host, then the database and role are dropped; Redis is flushed with no backup. The intent is recorded first, so a redeploy cannot re-provision behind you, and the app is restarted without the variable.", role: 'user' },
       { method: 'PUT', path: '/api/v1/apps/:name/domain', description: 'Set or clear a custom domain.', role: 'user' },
       { method: 'POST', path: '/api/v1/apps/:name/migrate-runtime', description: 'Move an app between PM2 and Docker runtimes.', role: 'admin' },
       { method: 'PUT', path: '/api/v1/apps/:name/capabilities', description: "Grant/clear the control-plane API capabilities DROP mints into this app's injected DROP_API_KEY (e.g. users:create). Empty array clears.", role: 'admin' },
@@ -262,8 +264,24 @@ export const ENDPOINT_GROUPS: EndpointGroupDef[] = [
       '200, not an error: most apps have no database. The `session` role below is a floor on top of another: ' +
       "server.ts also requires the `user` role, so a readonly operator's session is refused here too.",
     endpoints: [
-      { method: 'GET', path: '/api/v1/db/:name', description: 'Whether a database is provisioned, its name, size in bytes, and table count.', role: 'session' },
+      { method: 'GET', path: '/api/v1/db/:name', description: "Whether a database is provisioned, its name, size in bytes, and table count. Also the read side of backing services: whether Redis is provisioned, the recorded attach/detach intent per service, per-service quota state, and whether the app is ephemeral. A database recorded but missing on the server is reported as provisioned: false with a broken marker rather than an error, so the tab still renders its repair controls.", role: 'session' },
       { method: 'GET', path: '/api/v1/db/:name/tables', description: 'Per-table name, estimated row count (null/unanalysed until ANALYZE has run), and size in bytes.', role: 'session' },
+    ],
+  },
+  {
+    id: 'extensions',
+    title: 'Extensions',
+    basePath: '/api/v1/extensions',
+    sourceFile: 'src/api/routes/extensions.ts',
+    description:
+      'The catalogue behind the dashboard Catalog page: every backing service and app type this build ships, ' +
+      'with a short summary, keywords, a docs link, and whether it is available on this instance.',
+    note:
+      'Read-only, and platform-scoped rather than per-app: there is no :name here, so availability means installed, ' +
+      'disabled by configuration, or unsupported under this isolation mode. Per-app facts such as whether a service ' +
+      'is already attached, or whether your quota is full, come from GET /api/v1/db/:name instead.',
+    endpoints: [
+      { method: 'GET', path: '/api/v1/extensions', description: 'List every catalogued backing service and app type, with its availability on this instance.', role: 'readonly' },
     ],
   },
   {
