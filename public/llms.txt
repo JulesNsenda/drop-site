@@ -170,6 +170,76 @@ Refusals are structured, not silent. Expect: the app already supplies its own
 ephemeral, so attached data would be reaped on its timer; a cooldown between
 detaches on the same app; or the app is busy with another deploy.
 
+## Access control: gating, sharing and guests
+
+A deployed app is reachable by anyone with its URL unless a policy says
+otherwise. DROP can put a sign-in in front of an app, enforced at the proxy
+rather than inside the app, so it applies whatever the app is written in and
+needs no change to its code.
+
+This is opt in and off by default. An app with no policy behaves exactly as it
+did before the feature existed, and a platform administrator controls whether
+it is available at all. A share attempt made while the feature is switched off
+is refused and says so, rather than appearing to succeed while protecting
+nothing.
+
+A policy is:
+
+```
+mode:  drop-users        the only value today
+allow: [ user ids ]      on top of the app's owner and any admin
+```
+
+`mode` exists so a second identity source can be added later without changing
+the shape of every stored policy.
+
+The owner of an app manages its policy directly, without an administrator:
+
+```
+GET    /api/v1/apps/<app>/share                      read the policy
+POST   /api/v1/apps/<app>/share                      grant access
+DELETE /api/v1/apps/<app>/share/<userId>             revoke one user
+DELETE /api/v1/apps/<app>/share/guests/<guestId>     revoke one guest
+DELETE /api/v1/apps/<app>/share                      clear the policy
+```
+
+All require the `user` role and ownership. The grant body carries either
+`{ "username": "..." }` for someone with a DROP account, or
+`{ "email": "..." }` to invite a guest, never both: they name different kinds
+of principal, and silently preferring one would make the outcome depend on an
+unwritten field order. Add `"gateApp": true` to switch the gate on for the app
+in the same request.
+
+A guest has no DROP account. They are admitted to exactly one app by redeeming
+a single-use invitation sent to their email address, and that grant reaches
+nothing else on the instance: no dashboard, no other app. Invitations expire,
+and inviting is rate limited per person more tightly than other mail, because
+it is the one path that sends to an address the platform has never seen before.
+Guest records are retained for a window after they lapse
+(`DROP_GUEST_RETENTION_DAYS`, ninety days by default) so a revoked or expired
+grant stays auditable rather than vanishing when it stops working.
+
+Sharing is refused when the gate could not actually be enforced for that app,
+with the reason. A share that appeared to succeed while the app stayed open
+would be worse than a refusal, because the owner would believe it was
+protected.
+
+## Outbound mail
+
+DROP sends no email until an administrator configures an SMTP relay. There is
+no built in mail server. Guest invitations require it; share notifications can
+use it and are off by default.
+
+```
+PUT  /api/v1/admin/settings/mail             relay host, port, sender, notifications
+PUT  /api/v1/admin/settings/mail/credential  relay password, write only
+POST /api/v1/admin/mail/test                 send a test through the real relay
+```
+
+The password is stored encrypted and is never returned. Reading the settings
+reports only whether a credential is configured, never its value; setting it
+again is how it changes.
+
 ## REST API
 
 Base path `/api/v1` on the platform host (`https://dashboard.dropkit.sh/api/v1`
