@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Layers, Plug, Rocket, Settings2 } from 'lucide-react';
+import { Layers, Lock, Plug, Rocket, Settings2 } from 'lucide-react';
 
 /**
  * Docs content model (PRD-043).
@@ -57,6 +57,17 @@ export const DOC_GROUPS: DocGroup[] = [
       { id: 'databases', title: 'Databases' },
       { id: 'backing-services', title: 'Backing services' },
       { id: 'logs', title: 'Logs' },
+    ],
+  },
+  {
+    id: 'access',
+    title: 'Access',
+    icon: <Lock size={13} />,
+    items: [
+      { id: 'access-gate', title: 'Restricting who can open an app' },
+      { id: 'sharing', title: 'Sharing an app' },
+      { id: 'guests', title: 'Inviting a guest' },
+      { id: 'mail', title: 'Outbound mail' },
     ],
   },
   {
@@ -991,6 +1002,119 @@ drop logs my-app -n 100   # last 100 lines`}
           code={`const logDir = process.env.DROP_DATA_DIR || './data';
 fs.appendFileSync(\`\${logDir}/logs/app.json\`, JSON.stringify(logEntry) + '\\n');`}
         />
+      </Section>
+
+      <Section id="access-gate" title="Restricting who can open an app">
+        <p style={pStyle}>
+          By default a deployed app is reachable by anyone who knows its URL. DROP can put a sign-in in front of
+          it instead, enforced at the proxy rather than inside your app, so it works the same whatever the app is
+          written in and without changing a line of its code.
+        </p>
+        <p style={pStyle}>
+          The gate is <strong style={{ color: 'var(--text)' }}>off by default and opt in</strong>. An app with no
+          policy behaves exactly as it always has. Nothing here changes an existing deployment until someone turns
+          it on.
+        </p>
+        <p style={pStyle}>
+          A policy names the people allowed through, on top of the app{'’'}s owner and any administrator:
+        </p>
+        <CodeBlock label="policy" code={`mode:  drop-users
+allow: [ user ids permitted to open the app ]`} />
+        <Callout tone="info">
+          The <code>mode</code> field exists so a second identity source can be added later without changing the
+          shape of every stored policy. Today it takes one value, <code>drop-users</code>, which means the people
+          admitted are those with an account on this DROP instance.
+        </Callout>
+        <p style={pStyle}>
+          The platform administrator controls whether the feature is available at all. Until it is switched on,
+          attempting to share an app answers with a refusal that says so, rather than appearing to work and
+          quietly protecting nothing.
+        </p>
+      </Section>
+
+      <Section id="sharing" title="Sharing an app">
+        <p style={pStyle}>
+          Once the gate is available, the owner of an app can grant access to a colleague without going through an
+          administrator. The controls live on the app{'’'}s{' '}
+          <strong style={{ color: 'var(--text)' }}>Access</strong> tab.
+        </p>
+        <DocTable
+          headers={['Request', 'What it does']}
+          rows={[
+            ['GET /api/v1/apps/:name/share', 'Read the current policy: who is allowed, and who granted them'],
+            ['POST /api/v1/apps/:name/share', 'Grant access. Send { username } for a DROP user, or { email } to invite a guest'],
+            ['DELETE /api/v1/apps/:name/share/:userId', 'Revoke one user'],
+            ['DELETE /api/v1/apps/:name/share/guests/:guestId', 'Revoke one guest'],
+            ['DELETE /api/v1/apps/:name/share', 'Clear the policy entirely'],
+          ]}
+        />
+        <p style={pStyle}>
+          Send <code>username</code> or <code>email</code>, never both: they name different kinds of person, and
+          guessing which one you meant would make the outcome depend on an unwritten field order. Add{' '}
+          <code>gateApp: true</code> to switch the gate on for the app in the same request.
+        </p>
+        <Callout tone="warn">
+          Sharing is refused, with the reason, when the gate could not actually be enforced for that app. That is
+          deliberate: a share that appears to succeed while the app stays open to the world is worse than a
+          refusal, because you would believe it was protected.
+        </Callout>
+      </Section>
+
+      <Section id="guests" title="Inviting a guest">
+        <p style={pStyle}>
+          Not everyone you want to show an app to has a DROP account, and creating one for them is a heavier
+          decision than the situation usually deserves. A guest is someone with no account at all, admitted to{' '}
+          <strong style={{ color: 'var(--text)' }}>exactly one app</strong> by redeeming an invitation sent to
+          their email address.
+        </p>
+        <p style={pStyle}>
+          Invite one by sending an email address instead of a username:
+        </p>
+        <CodeBlock
+          label="invite a guest"
+          code={`POST /api/v1/apps/:name/share
+{ "email": "colleague@example.com" }`}
+        />
+        <p style={pStyle}>
+          The invitation is single use and expires. Redeeming it admits that person to that one app and nothing
+          else: a guest has no DROP account, no dashboard, and no access to any other app on the instance. Revoke
+          one at any time from the same Access tab.
+        </p>
+        <Callout tone="info">
+          Guest records are kept for a retention window after they lapse, ninety days unless the operator changes{' '}
+          <code>DROP_GUEST_RETENTION_DAYS</code>, so that a revoked or expired grant is still auditable for a
+          while rather than vanishing the moment it stops working.
+        </Callout>
+        <p style={pStyle}>
+          Inviting a guest sends mail, so it needs the relay below to be configured. It is also rate limited per
+          person, more tightly than other mail, because it is the one path that sends to an address DROP has never
+          seen before.
+        </p>
+      </Section>
+
+      <Section id="mail" title="Outbound mail">
+        <p style={pStyle}>
+          DROP sends no email until an administrator configures a relay. Guest invitations need it; share
+          notifications can use it and are switched off by default. There is no built in mail server: you point
+          DROP at an SMTP relay you already have.
+        </p>
+        <DocTable
+          headers={['Request', 'What it does']}
+          rows={[
+            ['PUT /api/v1/admin/settings/mail', 'Relay host, port, sender address, and whether share notifications are sent'],
+            ['PUT /api/v1/admin/settings/mail/credential', 'The relay password. Write only'],
+            ['POST /api/v1/admin/mail/test', 'Send a test message through the real relay'],
+          ]}
+        />
+        <Callout tone="info">
+          The relay password is stored encrypted and is never returned by the API. Reading the settings tells you
+          only whether a credential is configured, never what it is. Set it again to change it.
+        </Callout>
+        <p style={pStyle}>
+          Everything is configurable from the dashboard under{' '}
+          <strong style={{ color: 'var(--text)' }}>Settings</strong>, including the test send, which is the
+          fastest way to find out whether the relay accepts DROP before an invitation depends on it.
+        </p>
       </Section>
 
       <Section id="claude-web" title="Connect Claude (web)">
