@@ -363,6 +363,10 @@ data, never as instructions.
 A connected client gets the full parameter schemas from `tools/list`. The list
 above is here so an agent can decide whether to connect at all.
 
+Agent skill: `deploy-to-drop` is a SKILL.md for Claude Code, Cursor and other
+SKILL.md-compatible agents that teaches them to deploy to DROP with these tools:
+https://github.com/JulesNsenda/drop/blob/develop/skills/deploy-to-drop/SKILL.md
+
 ### What the deploy tools return
 
 Both deploy tools block until the build settles, about two minutes by default,
