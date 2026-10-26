@@ -1,0 +1,10 @@
+[
+  { "method": "GET", "path": "/api/v1/openapi.json", "reason": "The OpenAPI document itself: a machine-readable discovery route, not an API operation to document." },
+  { "method": "GET", "path": "/api/v1/app-access/:app/verify", "reason": "Access-gate hop: Caddy forward_auth target for gated tenant apps, called by the proxy, never by a client." },
+  { "method": "GET", "path": "/api/v1/app-access/authorize", "reason": "Access-gate hop: browser redirect target in the sign-in flow for a gated app; not a client-callable API." },
+  { "method": "GET", "path": "/api/v1/app-access/:app/exchange", "reason": "Access-gate hop: one-time code exchange performed by the browser on the app's host as part of the gate flow." },
+  { "method": "POST", "path": "/api/v1/app-access/code", "reason": "Access-gate hop: mints the flow-bound code for the dashboard consent page; internal to the gate flow." },
+  { "method": "GET", "path": "/api/v1/app-access/invite/:id", "reason": "Guest-invitation hop: landing URL from the invitation email (secret in fragment); a link target, not an API." },
+  { "method": "POST", "path": "/api/v1/app-access/invite-redeem", "reason": "Guest-invitation hop: called by the dashboard invite page to redeem the emailed secret; internal to the guest flow." },
+  { "method": "POST", "path": "/api/v1/app-access/guest-code", "reason": "Guest-invitation hop: mints the flow-bound code for a redeemed guest; internal to the guest flow." }
+]
