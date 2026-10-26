@@ -471,6 +471,10 @@ already exists is refused, and `POST /api/v1/git/redeploy/<app>` is how to
 update one. And a deploy already in flight answers 409 rather than queueing, so
 treat 409 as "wait and repeat", not as an error to report.
 
+A new app name uses letters, digits, `-` and `_` (no dots), and may not match an
+existing app or monorepo group, ignoring case. A taken name is refused (an
+upload answers 404, a git deploy 409): pick another, or pass `name`.
+
 The lightest case is worth calling out on its own: a directory of HTML, CSS and
 JS with no manifest at all is detected as a static site and served as one. An
 agent that just needs a page on a URL needs no `drop.yaml`, no build command and
