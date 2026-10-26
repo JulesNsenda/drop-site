@@ -1259,6 +1259,14 @@ allow: [ user ids permitted to open the app ]`} />
           </Link>{' '}
           for the REST endpoints.
         </p>
+        <p style={pStyle}>
+          Prefer to give your agent the instructions up front? The{' '}
+          <a href="https://github.com/JulesNsenda/drop/blob/develop/skills/deploy-to-drop/SKILL.md" style={linkStyle} target="_blank" rel="noopener noreferrer">
+            deploy-to-drop skill
+          </a>{' '}
+          is a <code>SKILL.md</code> for Claude Code, Cursor, and other <code>SKILL.md</code>-compatible agents that
+          teaches them to deploy to DROP.
+        </p>
       </Section>
 
       <div style={{ textAlign: 'center', padding: '8px 0 24px' }}>
