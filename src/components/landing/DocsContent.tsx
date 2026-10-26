@@ -449,7 +449,8 @@ sudo bash install.sh --from-release --isolation=docker`}
         />
         <p style={pStyle}>
           <code>--from-release</code> requires you to choose an isolation mode explicitly.{' '}
-          <code>--isolation=docker</code> runs each app in its own container; <code>--isolation=none</code> runs them
+          <code>--isolation=docker</code> runs each app in its own container (Node apps on Node 22);{' '}
+          <code>--isolation=none</code> runs them
           as the <code>drop</code> system user, which can read the platform's own secrets, so only pick that on a
           machine where every deployer is trusted. The installer verifies the bundle's SHA-256 before installing
           anything.
@@ -677,6 +678,7 @@ services:
             ['DROP_DISABLE_AUTH', 'false', 'Turn API auth off entirely (single-operator boxes). Auth is on by default'],
             ['DROP_ISOLATION', 'none', 'Runtime isolation mode: none runs apps under PM2, docker runs each in a container'],
             ['DROP_ENABLE_REDIS', 'true', 'Run the bundled managed Redis'],
+            ['DROP_MAX_CONCURRENT_BUILDS', '3', 'How many builds run at once. A deploy that arrives while all slots are busy waits its turn rather than failing'],
             ['DROP_MAX_APPS_PER_USER', '5', 'Default per-user app quota; a per-user override wins, and admins are unlimited. Companion limits exist for disk, memory, CPU, and databases'],
           ]}
         />
