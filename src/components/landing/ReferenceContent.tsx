@@ -23,7 +23,7 @@ import { Lock, Network } from 'lucide-react';
  * `ReferenceBody` prints it under each group as a quiet caption.
  */
 
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 /**
  * The role required to call an endpoint, per `authMiddleware(role)` wiring —
@@ -123,7 +123,7 @@ export const ENDPOINT_GROUPS: EndpointGroupDef[] = [
       { method: 'GET', path: '/api/v1/auth/api-keys', description: 'List API keys.', role: 'admin' },
       { method: 'DELETE', path: '/api/v1/auth/api-keys/:id', description: 'Delete an API key.', role: 'admin' },
       { method: 'GET', path: '/api/v1/auth/users', description: 'List users, with per-user app counts.', role: 'admin' },
-      { method: 'POST', path: '/api/v1/auth/users', description: 'Create a user.', role: 'admin' },
+      { method: 'POST', path: '/api/v1/auth/users', description: 'Create a user. An admin may set any role; a key holding the users:create capability may create user-role accounts only.', role: 'authenticated' },
       { method: 'PUT', path: '/api/v1/auth/users/:id', description: "Update a user's enabled state / role.", role: 'admin' },
       { method: 'POST', path: '/api/v1/auth/users/:id/reset-password', description: "Admin reset of a user's password.", role: 'admin' },
       { method: 'POST', path: '/api/v1/auth/agent-tokens', description: 'Mint a short-lived, app-scoped agent token ({ name, scopes[], expiresInMinutes? }). Scopes may only name apps you own.', role: 'user' },
@@ -157,6 +157,20 @@ export const ENDPOINT_GROUPS: EndpointGroupDef[] = [
       { method: 'PUT', path: '/api/v1/apps/:name/domain', description: 'Set or clear a custom domain.', role: 'user' },
       { method: 'POST', path: '/api/v1/apps/:name/migrate-runtime', description: 'Move an app between PM2 and Docker runtimes.', role: 'admin' },
       { method: 'PUT', path: '/api/v1/apps/:name/capabilities', description: "Grant/clear the control-plane API capabilities DROP mints into this app's injected DROP_API_KEY (e.g. users:create). Empty array clears.", role: 'admin' },
+      { method: 'GET', path: '/api/v1/apps/:name/source', description: "Download the app's source as a gzipped tarball, in the shape the upload accepts. Leaves out .git and never follows symlinks. An agent token is refused.", role: 'user' },
+      { method: 'GET', path: '/api/v1/apps/:name/rollback', description: 'Whether a last-good tree exists to roll back to.', role: 'readonly' },
+      { method: 'POST', path: '/api/v1/apps/:name/rollback', description: 'Restore the last-good code and restart, with no rebuild. Code only: the database, Redis, appdata, secrets and env are never restored.', role: 'user' },
+      { method: 'GET', path: '/api/v1/apps/:name/access', description: 'Read the browser access-gate policy, as enforced rather than merely recorded.', role: 'admin' },
+      { method: 'PUT', path: '/api/v1/apps/:name/access', description: 'Set the access-gate policy. Refused (409) when the platform cannot enforce the gate, instead of recording a policy that does nothing.', role: 'admin' },
+      { method: 'DELETE', path: '/api/v1/apps/:name/access', description: 'Remove the access-gate policy. Never refused for enforceability, so a control can always be removed.', role: 'admin' },
+      { method: 'GET', path: '/api/v1/apps/:name/share', description: "Who has access, from the owner's side: your own grants plus a count of everyone else's, never their identities.", role: 'user' },
+      { method: 'POST', path: '/api/v1/apps/:name/share', description: 'Grant access to a DROP user by username, or invite a guest by email. Only while app sharing is enabled.', role: 'user' },
+      { method: 'DELETE', path: '/api/v1/apps/:name/share', description: 'Clear the access policy, only when every entry was granted by you. Otherwise an admin clears it with DELETE /apps/:name/access.', role: 'user' },
+      { method: 'DELETE', path: '/api/v1/apps/:name/share/:userId', description: 'Revoke the access of a user you granted.', role: 'user' },
+      { method: 'PATCH', path: '/api/v1/apps/:name/share/guests/:guestId', description: 'Admin only (checked in the handler): disable or re-enable a guest. Disabling ends every live session immediately.', role: 'user' },
+      { method: 'DELETE', path: '/api/v1/apps/:name/share/guests/:guestId', description: "Revoke a guest's access to the app.", role: 'user' },
+      { method: 'GET', path: '/api/v1/apps/:name/domain', description: 'The custom domain, the DNS record to create, whether DNS points here yet, and the certificate once routed.', role: 'readonly' },
+      { method: 'POST', path: '/api/v1/apps/:name/domain/verify', description: 'Check DNS and, once it points here, route the domain so a certificate is issued. Idempotent: poll it.', role: 'user' },
     ],
   },
   {
@@ -167,6 +181,17 @@ export const ENDPOINT_GROUPS: EndpointGroupDef[] = [
     description: "The dashboard's app-limit indicator: your app count against your quota.",
     endpoints: [
       { method: 'GET', path: '/api/v1/usage', description: "Current user's app count and effective limit: a per-user override if set, else DROP_MAX_APPS_PER_USER (default 5). Reports limit 0, meaning unlimited, for admins and for an auth-disabled instance.", role: 'readonly' },
+    ],
+  },
+  {
+    id: 'limits',
+    title: 'Limits',
+    basePath: '/api/v1/limits',
+    sourceFile: 'src/api/routes/limits.ts',
+    description: 'Your own headroom against every deploy guardrail, readable before you spend it.',
+    note: 'Per caller only: every figure is keyed on your own principal, user id or apps. An admin sees their own figures, never a fleet total.',
+    endpoints: [
+      { method: 'GET', path: '/api/v1/limits', description: 'App quota, deploy quota, failure circuit breaker and disk ceiling for the caller, so a batch can be planned before a limit refuses it.', role: 'readonly' },
     ],
   },
   {
@@ -204,7 +229,9 @@ export const ENDPOINT_GROUPS: EndpointGroupDef[] = [
     description: 'Read-only deploy-pipeline observability: per-stage timelines for past deploys.',
     endpoints: [
       { method: 'GET', path: '/api/v1/deploys', description: 'Deploy episode history, newest first (?app=&limit=, max 200).', role: 'readonly' },
+      { method: 'GET', path: '/api/v1/deploys/stream', description: 'Follow a deploy from its 202 as Server-Sent Events (?app=&since=<acceptedAt>): the newest episode for the app that started at or after since.', role: 'readonly' },
       { method: 'GET', path: '/api/v1/deploys/:deployId', description: 'One deploy episode in full: every stage, and why it failed.', role: 'readonly' },
+      { method: 'GET', path: '/api/v1/deploys/:deployId/stream', description: "Follow one deploy's stage transitions as Server-Sent Events.", role: 'readonly' },
     ],
   },
   {
@@ -257,15 +284,16 @@ export const ENDPOINT_GROUPS: EndpointGroupDef[] = [
     sourceFile: 'src/api/routes/db.ts',
     description:
       "Read-only visibility into an app's provisioned database: whether one exists, its size, and its tables. " +
-      'Fixed catalogue queries only; there is no endpoint that runs app-authored SQL.',
+      'Fixed catalogue queries, plus an opt-in, admin-only, read-only SQL console that is off by default.',
     note:
-      'Session only, on both routes. An API key or OAuth token is refused however privileged it is, closing the ' +
+      'Session only, on every route. An API key or OAuth token is refused however privileged it is, closing the ' +
       "same anonymous-disclosure gap an auth-disabled instance would otherwise open. provisioned: false is a normal " +
       '200, not an error: most apps have no database. The `session` role below is a floor on top of another: ' +
       "server.ts also requires the `user` role, so a readonly operator's session is refused here too.",
     endpoints: [
       { method: 'GET', path: '/api/v1/db/:name', description: "Whether a database is provisioned, its name, size in bytes, and table count. Also the read side of backing services: whether Redis is provisioned, the recorded attach/detach intent per service, per-service quota state, and whether the app is ephemeral. A database recorded but missing on the server is reported as provisioned: false with a broken marker rather than an error, so the tab still renders its repair controls.", role: 'session' },
       { method: 'GET', path: '/api/v1/db/:name/tables', description: 'Per-table name, estimated row count (null/unanalysed until ANALYZE has run), and size in bytes.', role: 'session' },
+      { method: 'POST', path: '/api/v1/db/:name/query', description: "Run read-only SQL against the app's database. Admin only (checked in the handler), and only once the SQL console setting is on; it is off by default.", role: 'session' },
     ],
   },
   {
@@ -301,6 +329,18 @@ export const ENDPOINT_GROUPS: EndpointGroupDef[] = [
       { method: 'POST', path: '/api/v1/admin/settings/github-webhook-secret/generate', description: 'Generate and store a random webhook HMAC secret, revealed exactly once in this response.', role: 'admin' },
       { method: 'PUT', path: '/api/v1/admin/settings/github-webhook-secret', description: 'Set the webhook HMAC secret, or clear it with null/empty. The value is never echoed back.', role: 'admin' },
       { method: 'PUT', path: '/api/v1/admin/settings/user-connectors', description: 'Gate whether non-admin (user-role) accounts may set up their own claude.ai MCP connector. Strict boolean body, so a non-boolean is rejected rather than coerced. Defaults to true.', role: 'admin' },
+      { method: 'PUT', path: '/api/v1/admin/settings/app-sharing', description: 'Gate whether app owners may share their apps with other users. Strict boolean body.', role: 'admin' },
+      { method: 'PUT', path: '/api/v1/admin/settings/guest-invites', description: 'Gate whether owners may invite guests, people with no DROP account, by email. Strict boolean body.', role: 'admin' },
+      { method: 'PUT', path: '/api/v1/admin/settings/mail', description: 'Set the non-secret SMTP relay fields and the share-notification toggle. The relay password has its own write-only route.', role: 'admin' },
+      { method: 'PUT', path: '/api/v1/admin/settings/mail/credential', description: 'Set the SMTP relay password. Write-only: stored encrypted and never read back.', role: 'admin' },
+      { method: 'POST', path: '/api/v1/admin/mail/test', description: 'Send a test message through the real SMTP relay. Metered by the mail quota and rate-limited per IP.', role: 'admin' },
+      { method: 'POST', path: '/api/v1/admin/quiesce', description: 'Pause deploys for a bounded lease so a backup can snapshot a still platform (used by `drop backup`). Deploys defer rather than drop.', role: 'admin' },
+      { method: 'DELETE', path: '/api/v1/admin/quiesce', description: 'Release the quiesce early.', role: 'admin' },
+      { method: 'PUT', path: '/api/v1/admin/settings/sql-console', description: "Turn on the database panel's read-only SQL console. Off by default. Strict boolean body.", role: 'admin' },
+      { method: 'PUT', path: '/api/v1/admin/settings/object-storage', description: 'Set enabled, region and bucketPrefix. An absent key is left alone and null clears region or prefix. There is no endpoint field, on purpose.', role: 'admin' },
+      { method: 'PUT', path: '/api/v1/admin/settings/object-storage/credential', description: 'Set the AWS admin key pair used to create per-app buckets. Write-only: stored encrypted and never read back.', role: 'admin' },
+      { method: 'DELETE', path: '/api/v1/admin/settings/object-storage/credential', description: 'Forget the stored key. Existing buckets are untouched; new ones cannot be created until one is set.', role: 'admin' },
+      { method: 'POST', path: '/api/v1/admin/object-storage/test', description: 'Confirm the stored AWS key works (reads and creates nothing). Reports the AWS account, or only the AWS error name on failure.', role: 'admin' },
     ],
   },
   {
@@ -622,6 +662,7 @@ const METHOD_CHIP_CLASS: Record<HttpMethod, string> = {
   GET: 'dl-chip-get',
   POST: 'dl-chip-post',
   PUT: 'dl-chip-put',
+  PATCH: 'dl-chip-put',
   DELETE: 'dl-chip-del',
 };
 

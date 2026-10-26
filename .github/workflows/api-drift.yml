@@ -1,0 +1,26 @@
+name: API drift
+
+# Fails when src/components/landing/ReferenceContent.tsx disagrees with the
+# OpenAPI document DROP serves. The daily run catches drift introduced on the
+# DROP side (routes ship there first); PRs catch drift introduced here.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  api-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm run check:api-drift
