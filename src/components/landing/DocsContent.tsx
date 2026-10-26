@@ -649,7 +649,8 @@ services:
           Both are then reachable under <code>ezsign.&lt;your-domain&gt;</code>. Each service entry accepts most of
           the per-app fields above: <code>type</code>, <code>build</code>, <code>start</code>, <code>env</code>,{' '}
           <code>build_env</code>, <code>secrets</code>, <code>database</code>, <code>redis</code>,{' '}
-          <code>healthCheck</code>, <code>domains</code>, and <code>depends_on</code>.
+          <code>healthCheck</code>, <code>domains</code>, and <code>depends_on</code>. A group belongs to the repo that
+          first deployed it; another repo declaring the same <code>group</code> is refused.
         </p>
 
         <h3 style={h3Style}>Apps that are MCP servers</h3>

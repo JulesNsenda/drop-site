@@ -144,7 +144,7 @@ export const ENDPOINT_GROUPS: EndpointGroupDef[] = [
     endpoints: [
       { method: 'GET', path: '/api/v1/apps', description: 'List apps (filtered to your own unless admin).', role: 'readonly' },
       { method: 'GET', path: '/api/v1/apps/:name', description: 'Get one app, with live runtime stats.', role: 'readonly' },
-      { method: 'POST', path: '/api/v1/apps', description: 'Register/deploy a new app from a local path.', role: 'user' },
+      { method: 'POST', path: '/api/v1/apps', description: 'Register a folder already on the server as an app (used by `drop deploy` on the server). Tenants deploy with an upload or from git.', role: 'admin' },
       { method: 'PUT', path: '/api/v1/apps/:name', description: 'Update editable fields (framework, customDomain).', role: 'user' },
       { method: 'DELETE', path: '/api/v1/apps/:name', description: "Remove an app (?keepData=true preserves its database).", role: 'user' },
       { method: 'POST', path: '/api/v1/apps/:name/source', description: 'Deploy/redeploy from an uploaded gzipped tarball.', role: 'user' },
