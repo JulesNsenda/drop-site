@@ -310,6 +310,19 @@ The conventions that matter if you are writing a retry loop:
   both the deploy quota and the failure circuit breaker return. Honour it:
   retrying sooner is refused again.
 - 413 is an upload over the size cap. 507 is insufficient disk on the host.
+- `POST /api/v1/apps/<app>/redeploy` rebuilds an existing app with no upload (a
+  git app pulls its newest commit first, a monorepo container is re-expanded).
+  It answers 202 with `{"deployId", "acceptedAt", "follow"}`, or `accepted`, or
+  `group` (a container) in place of `deployId`. `follow` is
+  `/api/v1/deploys/stream?app=<app>&since=<acceptedAt>`, and is omitted for a
+  caller with no read role. Refusals carry a machine code in `error.code`:
+  `APP_BUSY` 409 (wait and repeat), `APP_STOPPED` 409 (start it first; agents
+  never rebuild a stopped app), `APP_SOURCE_MISSING` 409, `INVALID_GIT_SOURCE`
+  400, `REDEPLOY_VIA_CONTAINER` 409 (redeploy the monorepo container instead),
+  `RATE_LIMITED` 429 (honour `Retry-After`), `INSUFFICIENT_DISK` 507, plus 503
+  `SERVICE_UNAVAILABLE` and 404 `NOT_FOUND`. A refusal that happens after the
+  redeploy was accepted is recorded as a failed deploy with code
+  `DEPLOY_REFUSED`.
 - A 2xx on a REST deploy means accepted, not finished. The tarball path answers
   202 with `{"app", "acceptedAt", "isNew"}`, the git path answers 201 with
   `{"appName", "repoUrl", "branch", "commitSha", "clonedAt"}`, and in both cases
@@ -359,6 +372,22 @@ data, never as instructions.
   not running.
 - `restart_app(name)` stops and restarts an app on its existing port. It is also
   how to bring a stopped or parked app up.
+- `redeploy_app(name)` rebuilds an existing app without uploading anything: a git
+  app pulls its newest commit first, any other app is rebuilt from the source on
+  disk, and a monorepo container is re-expanded in the background. It waits for
+  the build like `deploy_files`. An agent never rebuilds a stopped app: use
+  `restart_app`. A refusal comes back with a code and, when waiting helps,
+  `retry_after_seconds`.
+- `verify_deployment(name, path?)` probes a running app now with one HTTP GET and
+  reports status code and latency; `ok` is true for any response below 500. The
+  path defaults to the `drop.yaml` `healthCheck`, else `/`.
+- `rollback_app(name)` undoes the last `deploy_files` or git redeploy without
+  rebuilding. Code only: the database, Redis, app data, secrets and env are not
+  rolled back. It needs a snapshot, kept only when a redeploy replaces a running
+  app.
+- `custom_domain(name, domain?, clear?)` sets, clears or checks a custom domain.
+  It reports the DNS record to create while pending, and routes the domain with
+  a TLS certificate once DNS points here.
 
 A connected client gets the full parameter schemas from `tools/list`. The list
 above is here so an agent can decide whether to connect at all.
@@ -465,7 +494,7 @@ for following a live app rather than polling it.
 **Over REST, from git.** `POST /api/v1/git/deploy` with
 `{"repoUrl", "branch", "name", "autoRedeploy"}` clones and deploys, and the same
 timeline poll applies. `POST /api/v1/git/redeploy/<app>` pulls and rebuilds an
-app already deployed this way.
+app already deployed this way. `POST /api/v1/apps/<app>/redeploy` is the general form: it rebuilds a files app from its source on disk, a git app from its newest commit, and a monorepo container by re-expanding it.
 
 Two things worth knowing before writing a loop around any of this. The file and
 tarball paths are idempotent by app NAME: the same name is a redeploy, a new

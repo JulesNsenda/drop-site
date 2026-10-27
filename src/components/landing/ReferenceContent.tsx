@@ -151,6 +151,7 @@ export const ENDPOINT_GROUPS: EndpointGroupDef[] = [
       { method: 'POST', path: '/api/v1/apps/:name/start', description: 'Start a stopped app.', role: 'user' },
       { method: 'POST', path: '/api/v1/apps/:name/stop', description: 'Stop a running app.', role: 'user' },
       { method: 'POST', path: '/api/v1/apps/:name/restart', description: 'Restart an app.', role: 'user' },
+      { method: 'POST', path: '/api/v1/apps/:name/redeploy', description: "Rebuild an existing app and swap it in, with no upload: a git app pulls its newest commit first, a monorepo container is re-expanded, any other app is rebuilt from the source on disk. Answers 202 with a deployId (or `accepted`, or `group`) and a `follow` link to /api/v1/deploys/stream. Refusals: APP_BUSY, APP_STOPPED, APP_SOURCE_MISSING, REDEPLOY_VIA_CONTAINER (409), INVALID_GIT_SOURCE (400), RATE_LIMITED (429), INSUFFICIENT_DISK (507). A refusal after acceptance is recorded as a failed deploy with code DEPLOY_REFUSED.", role: 'user' },
       { method: 'POST', path: '/api/v1/apps/:name/promote', description: 'Put a held build in front of traffic. Human sessions only. An agent token is refused (403) whatever its role.', role: 'user' },
       { method: 'POST', path: '/api/v1/apps/:name/services/:id', description: "Attach a backing service (:id is postgres or redis): provision it, record the intent, and restart the app with its URL injected. Returns the injected variable NAMES only, never their values. Refusals are structured, e.g. the app already supplies its own URL, quota exceeded, or the app is ephemeral.", role: 'user' },
       { method: 'DELETE', path: '/api/v1/apps/:name/services/:id', description: "Detach a backing service. Postgres is dumped on the host, then the database and role are dropped; Redis is flushed with no backup. The intent is recorded first, so a redeploy cannot re-provision behind you, and the app is restarted without the variable.", role: 'user' },
@@ -275,6 +276,7 @@ export const ENDPOINT_GROUPS: EndpointGroupDef[] = [
       { method: 'GET', path: '/api/v1/git/tokens', description: 'List stored GitHub PATs (names only, no values).', role: 'user' },
       { method: 'POST', path: '/api/v1/git/tokens', description: 'Store a GitHub personal access token.', role: 'user' },
       { method: 'DELETE', path: '/api/v1/git/tokens/:id', description: 'Remove a stored token.', role: 'user' },
+      { method: 'PUT', path: '/api/v1/git/tokens/:id/owner', description: 'Assign the owner of a stored token (the way out of a legacy ownerless token). Needs a signed-in session, not an API key.', role: 'admin' },
     ],
   },
   {
@@ -341,6 +343,8 @@ export const ENDPOINT_GROUPS: EndpointGroupDef[] = [
       { method: 'PUT', path: '/api/v1/admin/settings/object-storage/credential', description: 'Set the AWS admin key pair used to create per-app buckets. Write-only: stored encrypted and never read back.', role: 'admin' },
       { method: 'DELETE', path: '/api/v1/admin/settings/object-storage/credential', description: 'Forget the stored key. Existing buckets are untouched; new ones cannot be created until one is set.', role: 'admin' },
       { method: 'POST', path: '/api/v1/admin/object-storage/test', description: 'Confirm the stored AWS key works (reads and creates nothing). Reports the AWS account, or only the AWS error name on failure.', role: 'admin' },
+      { method: 'GET', path: '/api/v1/admin/object-storage/retired', description: 'Buckets whose app was deleted and which DROP did not destroy (kept on a keepData delete, or a teardown still being retried). Metadata only.', role: 'admin' },
+      { method: 'DELETE', path: '/api/v1/admin/object-storage/retired/:id', description: 'Permanently destroy a kept bucket and every object in it, with no backup. Dashboard session only (an API key is refused) and needs ?confirm=<id> repeating the id.', role: 'admin' },
     ],
   },
   {
@@ -446,7 +450,33 @@ export const MCP_TOOLS: McpToolDef[] = [
       'Build or runtime output for a specific deploy, defaulting to the phase it actually died in. This is the one ' +
       'to reach for after a failed deploy: app_logs shows only what is running now, and a failed deploy is not.',
   },
+  {
+    name: 'verify_deployment',
+    description:
+      'Probe one of your running apps now with a single HTTP GET and report status code and latency. ok is true for any ' +
+      "response below 500. The path defaults to the app's drop.yaml healthCheck, else /; the body is never returned.",
+  },
+  {
+    name: 'rollback_app',
+    description:
+      'Undo the last deploy_files or git redeploy without rebuilding. Code only: the database, Redis, app data, secrets ' +
+      'and env are not rolled back. Needs a snapshot, kept only when a redeploy replaces a running app.',
+  },
+  {
+    name: 'custom_domain',
+    description:
+      'Set (domain), clear (clear: true) or check a custom domain for one of your apps. Reports the DNS record to create ' +
+      'while pending, and routes it with a TLS certificate once DNS points here.',
+  },
   { name: 'restart_app', description: 'Stop and restart an app on its existing port. Also how to bring a stopped or freshly-deployed app up.' },
+  {
+    name: 'redeploy_app',
+    description:
+      'Rebuild an existing app without uploading anything: a git app pulls its newest commit first, any other app is ' +
+      'rebuilt from the source on disk. Waits for the build like deploy_files. A monorepo container is re-expanded in ' +
+      'the background. An agent never rebuilds a stopped app (use restart_app). A refusal (busy, stopped, rate-limited, ' +
+      'low disk) comes back with a code and, when waiting helps, retry_after_seconds.',
+  },
 ];
 
 /* ------------------------------------------------------------------------ */
@@ -1064,7 +1094,7 @@ curl http://localhost:3000/api/v1/apps \\
 
       <Section id="mcp-tools" title="MCP tools">
         <p style={pStyle}>
-          The hosted MCP endpoint (<code>POST /api/v1/mcp</code>) exposes these seven tools to any MCP client,
+          The hosted MCP endpoint (<code>POST /api/v1/mcp</code>) exposes these tools to any MCP client,
           claude.ai over OAuth, or Claude Code / Cursor with an API key in a header. There is deliberately no tool for
           reading secrets or deleting an app: a connected agent cannot do either.
         </p>
