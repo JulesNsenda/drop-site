@@ -151,6 +151,7 @@ export const ENDPOINT_GROUPS: EndpointGroupDef[] = [
       { method: 'POST', path: '/api/v1/apps/:name/start', description: 'Start a stopped app.', role: 'user' },
       { method: 'POST', path: '/api/v1/apps/:name/stop', description: 'Stop a running app.', role: 'user' },
       { method: 'POST', path: '/api/v1/apps/:name/restart', description: 'Restart an app.', role: 'user' },
+      { method: 'POST', path: '/api/v1/apps/:name/redeploy', description: "Rebuild an existing app and swap it in, with no upload: a git app pulls its newest commit first, a monorepo container is re-expanded, any other app is rebuilt from the source on disk. Answers 202 with a deployId (or `accepted`, or `group`) and a `follow` link to /api/v1/deploys/stream. Refusals: APP_BUSY, APP_STOPPED, APP_SOURCE_MISSING, REDEPLOY_VIA_CONTAINER (409), INVALID_GIT_SOURCE (400), RATE_LIMITED (429), INSUFFICIENT_DISK (507). A refusal after acceptance is recorded as a failed deploy with code DEPLOY_REFUSED.", role: 'user' },
       { method: 'POST', path: '/api/v1/apps/:name/promote', description: 'Put a held build in front of traffic. Human sessions only. An agent token is refused (403) whatever its role.', role: 'user' },
       { method: 'POST', path: '/api/v1/apps/:name/services/:id', description: "Attach a backing service (:id is postgres or redis): provision it, record the intent, and restart the app with its URL injected. Returns the injected variable NAMES only, never their values. Refusals are structured, e.g. the app already supplies its own URL, quota exceeded, or the app is ephemeral.", role: 'user' },
       { method: 'DELETE', path: '/api/v1/apps/:name/services/:id', description: "Detach a backing service. Postgres is dumped on the host, then the database and role are dropped; Redis is flushed with no backup. The intent is recorded first, so a redeploy cannot re-provision behind you, and the app is restarted without the variable.", role: 'user' },
@@ -447,6 +448,14 @@ export const MCP_TOOLS: McpToolDef[] = [
       'to reach for after a failed deploy: app_logs shows only what is running now, and a failed deploy is not.',
   },
   { name: 'restart_app', description: 'Stop and restart an app on its existing port. Also how to bring a stopped or freshly-deployed app up.' },
+  {
+    name: 'redeploy_app',
+    description:
+      'Rebuild an existing app without uploading anything: a git app pulls its newest commit first, any other app is ' +
+      'rebuilt from the source on disk. Waits for the build like deploy_files. A monorepo container is re-expanded in ' +
+      'the background. An agent never rebuilds a stopped app (use restart_app). A refusal (busy, stopped, rate-limited, ' +
+      'low disk) comes back with a code and, when waiting helps, retry_after_seconds.',
+  },
 ];
 
 /* ------------------------------------------------------------------------ */
@@ -1064,7 +1073,7 @@ curl http://localhost:3000/api/v1/apps \\
 
       <Section id="mcp-tools" title="MCP tools">
         <p style={pStyle}>
-          The hosted MCP endpoint (<code>POST /api/v1/mcp</code>) exposes these seven tools to any MCP client,
+          The hosted MCP endpoint (<code>POST /api/v1/mcp</code>) exposes these tools to any MCP client,
           claude.ai over OAuth, or Claude Code / Cursor with an API key in a header. There is deliberately no tool for
           reading secrets or deleting an app: a connected agent cannot do either.
         </p>
