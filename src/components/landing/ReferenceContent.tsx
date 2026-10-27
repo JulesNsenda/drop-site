@@ -276,6 +276,7 @@ export const ENDPOINT_GROUPS: EndpointGroupDef[] = [
       { method: 'GET', path: '/api/v1/git/tokens', description: 'List stored GitHub PATs (names only, no values).', role: 'user' },
       { method: 'POST', path: '/api/v1/git/tokens', description: 'Store a GitHub personal access token.', role: 'user' },
       { method: 'DELETE', path: '/api/v1/git/tokens/:id', description: 'Remove a stored token.', role: 'user' },
+      { method: 'PUT', path: '/api/v1/git/tokens/:id/owner', description: 'Assign the owner of a stored token (the way out of a legacy ownerless token). Needs a signed-in session, not an API key.', role: 'admin' },
     ],
   },
   {
@@ -342,6 +343,8 @@ export const ENDPOINT_GROUPS: EndpointGroupDef[] = [
       { method: 'PUT', path: '/api/v1/admin/settings/object-storage/credential', description: 'Set the AWS admin key pair used to create per-app buckets. Write-only: stored encrypted and never read back.', role: 'admin' },
       { method: 'DELETE', path: '/api/v1/admin/settings/object-storage/credential', description: 'Forget the stored key. Existing buckets are untouched; new ones cannot be created until one is set.', role: 'admin' },
       { method: 'POST', path: '/api/v1/admin/object-storage/test', description: 'Confirm the stored AWS key works (reads and creates nothing). Reports the AWS account, or only the AWS error name on failure.', role: 'admin' },
+      { method: 'GET', path: '/api/v1/admin/object-storage/retired', description: 'Buckets whose app was deleted and which DROP did not destroy (kept on a keepData delete, or a teardown still being retried). Metadata only.', role: 'admin' },
+      { method: 'DELETE', path: '/api/v1/admin/object-storage/retired/:id', description: 'Permanently destroy a kept bucket and every object in it, with no backup. Dashboard session only (an API key is refused) and needs ?confirm=<id> repeating the id.', role: 'admin' },
     ],
   },
   {
@@ -446,6 +449,24 @@ export const MCP_TOOLS: McpToolDef[] = [
     description:
       'Build or runtime output for a specific deploy, defaulting to the phase it actually died in. This is the one ' +
       'to reach for after a failed deploy: app_logs shows only what is running now, and a failed deploy is not.',
+  },
+  {
+    name: 'verify_deployment',
+    description:
+      'Probe one of your running apps now with a single HTTP GET and report status code and latency. ok is true for any ' +
+      "response below 500. The path defaults to the app's drop.yaml healthCheck, else /; the body is never returned.",
+  },
+  {
+    name: 'rollback_app',
+    description:
+      'Undo the last deploy_files or git redeploy without rebuilding. Code only: the database, Redis, app data, secrets ' +
+      'and env are not rolled back. Needs a snapshot, kept only when a redeploy replaces a running app.',
+  },
+  {
+    name: 'custom_domain',
+    description:
+      'Set (domain), clear (clear: true) or check a custom domain for one of your apps. Reports the DNS record to create ' +
+      'while pending, and routes it with a TLS certificate once DNS points here.',
   },
   { name: 'restart_app', description: 'Stop and restart an app on its existing port. Also how to bring a stopped or freshly-deployed app up.' },
   {

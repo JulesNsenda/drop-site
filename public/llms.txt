@@ -378,6 +378,16 @@ data, never as instructions.
   the build like `deploy_files`. An agent never rebuilds a stopped app: use
   `restart_app`. A refusal comes back with a code and, when waiting helps,
   `retry_after_seconds`.
+- `verify_deployment(name, path?)` probes a running app now with one HTTP GET and
+  reports status code and latency; `ok` is true for any response below 500. The
+  path defaults to the `drop.yaml` `healthCheck`, else `/`.
+- `rollback_app(name)` undoes the last `deploy_files` or git redeploy without
+  rebuilding. Code only: the database, Redis, app data, secrets and env are not
+  rolled back. It needs a snapshot, kept only when a redeploy replaces a running
+  app.
+- `custom_domain(name, domain?, clear?)` sets, clears or checks a custom domain.
+  It reports the DNS record to create while pending, and routes the domain with
+  a TLS certificate once DNS points here.
 
 A connected client gets the full parameter schemas from `tools/list`. The list
 above is here so an agent can decide whether to connect at all.
