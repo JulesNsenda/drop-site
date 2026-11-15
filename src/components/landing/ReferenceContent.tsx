@@ -326,6 +326,7 @@ export const ENDPOINT_GROUPS: EndpointGroupDef[] = [
       { method: 'POST', path: '/api/v1/admin/users/:id/unsuspend', description: 'Re-enable a suspended user.', role: 'admin' },
       { method: 'GET', path: '/api/v1/admin/quota', description: 'Platform-wide app/user/disk quota summary.', role: 'admin' },
       { method: 'POST', path: '/api/v1/admin/apps/:name/suspend', description: 'Stop an app and mark it suspended.', role: 'admin' },
+      { method: 'POST', path: '/api/v1/admin/apps/:name/unsuspend', description: 'Lift an app suspension. The app stays stopped until its owner starts it. Dashboard session only (an API key is refused).', role: 'admin' },
       { method: 'GET', path: '/api/v1/admin/settings', description: 'Platform settings: the public base URL (OAuth issuer) and whether a GitHub webhook secret is set. Never returns the secret itself.', role: 'admin' },
       { method: 'PUT', path: '/api/v1/admin/settings/public-url', description: 'Set or clear the DROP_PUBLIC_URL override. HTTPS-only (localhost excepted), applied live without a restart, and fails closed. It never infers an issuer from the Host header.', role: 'admin' },
       { method: 'POST', path: '/api/v1/admin/settings/github-webhook-secret/generate', description: 'Generate and store a random webhook HMAC secret, revealed exactly once in this response.', role: 'admin' },
